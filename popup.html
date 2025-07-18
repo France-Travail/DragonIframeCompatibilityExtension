@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Edit Text</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      margin: 0;
+    }
+
+    textarea {
+      flex-grow: 1;
+      width: calc(100% - 20px); /* Account for padding */
+      margin: 10px;
+      padding: 10px;
+      border: 1px solid #ccc;
+      box-sizing: border-box; /* Prevent padding from increasing size */
+      font-size: 16px;
+      line-height: 1.5;
+    }
+
+    button {
+      padding: 10px 15px;
+      margin: 10px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+
+    button:hover {
+      background-color: #0056b3;
+    }
+  </style>
+</head>
+<body>
+  <textarea id="popupTextarea"></textarea>
+  <button id="doneButton">Valider</button>
+  <script src="popup.js"></script>
+</body>
+</html>
