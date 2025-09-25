@@ -186,21 +186,27 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       //simulateHumanTyping(activeInput,message.text);
 
       //activeInput.value = message.text; // Replace the entire content with the edited text
-      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-                    setter.call(activeInput,message.text);
+      setNativeValue(activeInput, message.text);
+
+      
+      // const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+      //               setter.call(activeInput,message.text);
+      
+      
+      
       const event = new Event("input", { bubbles: true });
      
       activeInput.dispatchEvent(event);
 
 
-       const keydownEvent = new KeyboardEvent('keydown', {
-            key: char,
-            code: `Key${char.toUpperCase()}`,
-            keyCode: char.charCodeAt(0),
-            which: char.charCodeAt(0),
-            bubbles: true,
-            cancelable: true
-        });
+      //  const keydownEvent = new KeyboardEvent('keydown', {
+      //       key: char,
+      //       code: `Key${char.toUpperCase()}`,
+      //       keyCode: char.charCodeAt(0),
+      //       which: char.charCodeAt(0),
+      //       bubbles: true,
+      //       cancelable: true
+      //   });
       //activeInput.f_setValue(message.text);
 
       console.log("✅ Text inserted from popup");
@@ -211,6 +217,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     console.log("Failed not a active input in this iframe " + activeInput);
   }
 });
+
+
+function setNativeValue(el, value) {
+    if (!el) return;
+
+    // Grab the right prototype for the element (input, textarea, etc.)
+    const prototype = Object.getPrototypeOf(el);
+    const valueSetter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set;
+
+    if (valueSetter) {
+        valueSetter.call(el, value);
+    } else {
+        // Fallback if for some reason no setter is found
+        el.value = value;
+    }
+
+    // Dispatch events so frameworks (React, Angular, Vue, etc.) update their state
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+}
 
 
 // Add this function at the top of your content script
