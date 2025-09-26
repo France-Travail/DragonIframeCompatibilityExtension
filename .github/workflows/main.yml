@@ -1,0 +1,45 @@
+name: Build & Release Chrome Extension
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Extract version from tag, strip leading v (v1.2.3 → 1.2.3)
+      - name: Get release version
+        run: |
+          RAW_VERSION=${GITHUB_REF#refs/tags/}
+          CLEAN_VERSION=${RAW_VERSION#v}
+          echo "VERSION=$CLEAN_VERSION" >> $GITHUB_ENV
+
+      # Replace placeholders in manifest.json and update_manifest.xml
+      - name: Update version placeholders
+        run: |
+          sed -i "s/<<version>>/${VERSION}/g" manifest.json
+          sed -i "s/<<version>>/${VERSION}/g" update_manifest.xml
+          sed -i "s|USER/REPO|${{ github.repository }}|g" update_manifest.xml
+
+      # Pack CRX (requires Chrome + private key)
+      - name: Pack extension
+        run: |
+          mkdir dist
+          echo "$EXTENSION_PRIVATE_KEY" | base64 -d > extension.pem
+          google-chrome --no-sandbox --pack-extension=. --pack-extension-key=extension.pem
+          mv *.crx dist/DragonIframeCompatibilityExtension.crx
+          cp update_manifest.xml dist/
+          cp manifest.json dist/
+
+      # Upload release assets
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/DragonIframeCompatibilityExtension.crx
+            dist/update_manifest.xml
+            dist/manifest.json
