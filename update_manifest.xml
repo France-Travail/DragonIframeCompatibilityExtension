@@ -1,0 +1,7 @@
+<gupdate xmlns="http://www.google.com/update2/response" protocol="2.0">
+    <app appid="lgpijbpjlolnmfogmdjcafdfcmfdbiaj">
+        <updatecheck 
+            codebase="https://github.com/France-Travail/DragonIframeCompatibilityExtension/releases/download/<<version>>/DragonIframeCompatibilityExtension.crx"
+            version="<<version>>" />
+    </app>
+</gupdate>
