@@ -1,0 +1,166 @@
+name: Release Chrome Extension
+
+on:
+  push:
+    tags:
+      - 'v*'  # Triggers on version tags like v1.0.0
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Required for creating releases
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Extract version from tag
+        id: get_version
+        run: |
+          # Remove 'v' prefix from tag (e.g., v1.0.0 -> 1.0.0)
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+      
+      - name: Update manifest.json version
+        run: |
+          VERSION=${{ steps.get_version.outputs.version }}
+          # Update version in manifest.json
+          jq --arg version "$VERSION" '.version = $version' manifest.json > manifest.tmp
+          mv manifest.tmp manifest.json
+          echo "Updated manifest.json to version $VERSION"
+      
+      - name: Setup Node.js (if needed for build)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install dependencies (if needed)
+        run: |
+          if [ -f package.json ]; then
+            npm ci
+          fi
+      
+      - name: Build extension (if needed)
+        run: |
+          if [ -f package.json ] && [ -n "$(jq -r '.scripts.build // empty' package.json)" ]; then
+            npm run build
+          fi
+      
+      - name: Package extension as ZIP
+        run: |
+          # Create a zip file with extension files
+          # Adjust the files/folders to include based on your project structure
+          zip -r DragonIframeCompatibilityExtension.zip \
+            manifest.json \
+            *.js \
+            *.html \
+            *.css \
+            icons/ \
+            -x "*.git*" "node_modules/*" "*.zip" "*.crx" "*.pem"
+      
+      - name: Install Chrome (for CRX packaging)
+        run: |
+          wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+          echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+          sudo apt-get update
+          sudo apt-get install -y google-chrome-stable
+      
+      - name: Generate private key (first run only)
+        id: generate_key
+        run: |
+          if [ ! -f extension.pem ]; then
+            echo "Generating new private key..."
+            openssl genrsa -out extension.pem 2048
+            echo "new_key=true" >> $GITHUB_OUTPUT
+          else
+            echo "Using existing private key"
+            echo "new_key=false" >> $GITHUB_OUTPUT
+          fi
+        env:
+          PEM_KEY: ${{ secrets.EXTENSION_PEM_KEY }}
+      
+      - name: Restore private key from secrets
+        if: steps.generate_key.outputs.new_key == 'false'
+        run: |
+          echo "${{ secrets.EXTENSION_PEM_KEY }}" > extension.pem
+      
+      - name: Package extension as CRX
+        run: |
+          # Create CRX file using Chrome
+          google-chrome --pack-extension=. --pack-extension-key=extension.pem
+          
+          # The CRX file will be created in the parent directory
+          if [ -f ../DragonIframeCompatibilityExtension.crx ]; then
+            mv ../DragonIframeCompatibilityExtension.crx .
+          elif [ -f *.crx ]; then
+            mv *.crx DragonIframeCompatibilityExtension.crx
+          fi
+      
+      - name: Generate update_manifest.xml
+        run: |
+          VERSION=${{ steps.get_version.outputs.version }}
+          cat > update_manifest.xml << EOF
+          <?xml version='1.0' encoding='UTF-8'?>
+          <gupdate xmlns="http://www.google.com/update2/response" protocol="2.0">
+              <app appid="lgpijbpjlolnmfogmdjcafdfcmfdbiaj">
+                  <updatecheck 
+                      codebase="https://github.com/France-Travail/DragonIframeCompatibilityExtension/releases/download/v${VERSION}/DragonIframeCompatibilityExtension.crx"
+                      version="${VERSION}" />
+              </app>
+          </gupdate>
+          EOF
+          echo "Generated update_manifest.xml:"
+          cat update_manifest.xml
+      
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            DragonIframeCompatibilityExtension.crx
+            DragonIframeCompatibilityExtension.zip
+            update_manifest.xml
+          body: |
+            ## Chrome Extension Release v${{ steps.get_version.outputs.version }}
+            
+            ### Installation
+            
+            **Option 1: Install CRX (Recommended)**
+            1. Download `DragonIframeCompatibilityExtension.crx`
+            2. Open Chrome and navigate to `chrome://extensions/`
+            3. Enable "Developer mode"
+            4. Drag and drop the CRX file into the extensions page
+            
+            **Option 2: Install from ZIP**
+            1. Download `DragonIframeCompatibilityExtension.zip`
+            2. Extract the ZIP file
+            3. Open Chrome and navigate to `chrome://extensions/`
+            4. Enable "Developer mode"
+            5. Click "Load unpacked" and select the extracted folder
+            
+            ### Auto-update Configuration
+            
+            For enterprise deployments, use the `update_manifest.xml` file with the update URL:
+            ```
+            https://github.com/France-Travail/DragonIframeCompatibilityExtension/releases/download/v${{ steps.get_version.outputs.version }}/update_manifest.xml
+            ```
+            
+            ### Files
+            - `DragonIframeCompatibilityExtension.crx` - Packaged Chrome extension
+            - `DragonIframeCompatibilityExtension.zip` - Source files for manual installation
+            - `update_manifest.xml` - Auto-update manifest for enterprise deployments
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Save private key reminder
+        if: steps.generate_key.outputs.new_key == 'true'
+        run: |
+          echo "⚠️  IMPORTANT: A new private key was generated!"
+          echo "Save this private key as a GitHub secret named 'EXTENSION_PEM_KEY'"
+          echo "Key content:"
+          cat extension.pem
+          echo ""
+          echo "Go to: Settings → Secrets and variables → Actions → New repository secret"
