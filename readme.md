@@ -152,6 +152,18 @@ Téléversez l’archive sur le tableau de bord développeur Chrome.
 | Taille du pop‑up | `background.js` |
 
 ---
+## Release d'une nouvelle version
+
+La mise à jour est désormais possible, concernant le procédé de mise à jour des versions suivantes il faudra respecter ces 5 points :
+- Le nom du fichier update_manifest.xml ne doit pas changer.
+(Ex : Pour Dragon Iframe, il restera "https://github.com/France-Travail/DragonIframeCompatibilityExtension/releases/download/v1.1.0/update_manifest.xml")
+ça sera uniquement son contenu (pointe vers un nouveau .crx et indique une nouvelle version) qui changera.
+- L’ID de l’extension doit rester la même.
+- Le update_manifest.xml reste accessible en HTTPS.
+- Le nouveau .crx doit être signé avec la même clé privée que l'ancien. (Sinon Chrome rejettera la mise à jour avec une erreur du type Signature verification failed.)
+- La version indiquée dans le XML doit être supérieure à la version courante (Ex : <updatecheck codebase="https://.../v2/extension.crx" version="2.1.0" />)
+
+---
 ## Sécurité & vie privée
 Pas de stockage ni de trafic externes.
 
